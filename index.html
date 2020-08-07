@@ -1,137 +1,43 @@
-
 <html>
 <head>
-
-<title>Finding Bugs in Clash of Clans</title>
+    
+<title>PsychoBird's Blog | psychobird.github.io</title>
 <body style="font-family:'Helvetica'">
-<style>code.indent{ padding-left: 1.8em }</style>
+    
 
+<style>
+    code.indent{
+        padding-left: 1.8em
+    }
+    
+    div {
+      background-color: clear;
+      width: 60%;
+      border: 15px clear;
+      padding: 50px;
+      margin: auto;
+    }
 
-<center><h1>Never Trust The User - Breaking Clash of Clans' CSV Files</h1></center>
+    body {
+        font-size: 17px;
+    }
 
-<br><p>
-Before we start, I just want to make sure it is WELL known that everything in this writeup has been patched for a long time (kinda - it's complicated. I'll touch on that later) thanks to the cooperation of the Clash of Clans team. At the time you're reading this post, chances are nothing here is applicable anymore. The Clash of Clans developers did a wonderful job making sure nobody can load their own or modified CSV files in game which is important because the game is headed in the E-Sports direction with tournaments that hold a $1,000,000 bounty.
-</p>
-<center><h2>A Short History Lesson</h2></center>
+</style>
 
-<p>Prior to December of 2019, for over 7 years after the games launch, CSV files were not checked by the game for modification. The implications of this being any user could write their own edits into the CSV files and load them into the game. When dealing with crucial game assets, user data that is loaded / sent to the server should NEVER be automatically trusted. The CSV files needed to be decompressed, but a quick Google search sorted that issue out nicely. If you're curious about decompressing the files, read <a href="https://github.com/clanner/cocdp/wiki/Csv-Files">this.</a>
-</p>
+<div>
+<center>
+<h1>PsychoBird's Blog</h1>
+<code><a href="https://github.com/PsychoBird">> whoami</a></code><hr>
+</center>
 
-<p>
-It should also be mentioned that Clash of Clans' server makes sure nobody can give themseles 9 million gems with a simple file edit, but throughout the years a few bugs slipped through the cracks.
-</p>
+<br><h1>SearchKit & RevelariOS - Filling a gap in the tools available to jailbreakers</h1>
+<p>Coming soon...</p><hr>
 
-
-<p>
-Back in 2015, there was a method to get unlimited attacks in clan wars by changing a troop's movement speed and deploying it if the attack was going poorly. Any player could practice endlessly because if they didn't like the attack result, they could just deploy this special modded troop and the game would desync and disconnect  without counting the attack as completed. This mod got patched because too many people caught onto it. People would sell this cheating method to someone, then that person would sell it, and so on. Keep that idea in mind.
-</p>
-
-<p>
-Up until mid-2016, players could swap the trap animations and make traps visible while attacking. This was an easy mod to install, so inevitably too many people caught onto it and it was patched. The developers simply changed how it handled untriggered trap animations.
-</p>
-
-
-<center><h2>The Gem Exploit</h2></center>
-
-<p>
-In December 2018, I stumbled upon <code>billing_packages.csv</code> and started poking around, hoping to find some assets not checked by the server for modification.
-</p>
-
-<p>
-To keep this short, there is a column in the CSV file named <code>disabled</code>. Supercell would disable the special deal packages so they wouldn't appear in the shop, but they would still be in the game for special bundles that would the developers would offer once in a while in the "Special Offers" tab. The only packages enabled were the standard $0.99-$99.99 packs always in the shop.
-</p>
-
-<p>
-Occasionally, Supercell would offer a $2.99 for 5,000 gem package for STRICTLY new players to get them involved in the game. Higher town halls had this package disabled.
-</p>
-
-<p>
-By simply changing the boolean value for this package in the <code>disabled</code> column from TRUE to FALSE, it would be enabled in shop. Any player can now buy the cheap package. Oh, and I forgot to mention - once enabled, it could be bought an unlimited amount of times despite the developers intending for it to only be bought once. This means anybody with this mod could buy gems at around a ~95% discount. That's a pretty good deal.
-</p>
-
-<p>
-This was swiftly patched by the developers for obvious reasons (prior to this I had no contact with Supercell - how they figured this bug out is beyond me). All of these special packages are now handled by the server. Going into the CSV file today, you'll see 0 gems instead of 5,000. If anyone attempts to purchase it, they'll donate $3 to Supercell and get nothing in return. (And no - the 0 can't be changed to 5,000 or above)
-</p>
-<br>
-<center><img src="Pics/shop.jpg" alt="Image" height="666" width="1024"></center>
-<br>
-
-
-<center><h2>Trap Viewer<h2></center>
-
-<p>
-Around the same time I discovered a similar way of uncovering traps in game as described above. I won't be going into any details of this JUST IN CASE somebody finds a way to use it. I highly doubt that will happen, but it's better safe than sorry.
-</p>
-
-<p>
-This time the stakes were slightly higher. Fixing this vulnerability was fairly important because it could provide a significant advantage in game. There was a $1,000,000 reward for winning the E-Sports league created by Supercell, and having a simple mod that is easy to install is not the ideal when an expensive tournament is taking place. Normally these CSV mods were fairly small exploits (minus the gem bug) but this could create some issues if malicious players on an E-Sports team came across somebody selling this mod.
-</p>
-
-<p>
-I had this exploit stored away while I was working on other projects. Eventually, somebody else discovered the same exploit and decided to start giving out copies of this trap viwer mod (doesn't this sound familiar?) Some people were buying it for around $250-$1000 from various sources and it kept being redistributed. After a while, I decided to help in the process of getting this patched. At the time, the state of the exploit was pretty bad - everyone and their mother had a copy of this trap viewer mod. I reached out to someone on the Clash of Clans team who implemented some security to stop the average player from installing these mods.
-</p>
-
-<center><h2>CSV Signatures</h2></center>
-
-<p>
-Remember when I said some of these mods technically aren't patched? That's because the trap viewer mod still exists in the game. You can make the same file modifications as I did, except the game will not load the modded CSV file. Why? Let's dig into some research I did after the December 2019 update. Everything below I discovered sleep deprived at 5 AM right after the update dropped on a Monday before class.
-</p>
-
-<p>
-In the update, the way the game handles CSV files was changed. A 64 byte signature (the yellow highlight) + 4 byte signature indicator (the red highlight) was added to the header of each CSV file.
-</p>
-
-<center>globals.csv</center>
-
-<center><img src="Pics/csv.jpg" alt="Image" height="268" width="1112"></center>
-<br>
-
-<p>
-The signature check was a pretty good implementation. Most of the players installing game mods didn't know how they worked, so there was no way they would update the mod to work with the updated game files. For those that did know how it worked, they would still need to figure out how to decompress the new files since the 68 byte header broke the old decompression tools that were commonly used.
-</p>
-
-<p>
-Now, every CSV file starts with <code>SIG:</code> (the red highlight). Before the update, every file started with <code>5D 00 00 04 00</code> (the green highlight). These 4 bytes + the 64 byte signature pad the file slightly. To compensate, I wrote a small script to decompress the new files and strip the signature automatically. Removing the signature was fairly easy using <code>dd</code>, wiping everything before <code>0x44</code> and then decompressing the file. The script won't be posted, but there are plenty of resources on Google for those curious.
-</p>
-
-<p>
-After updating the mod to work with the newest version of Clash of Clans, I was met with another roadblock - the CSV files refused to be loaded by the game. Before I get into the bypass, let's discuss how the game loads CSV files and checks them.
-</p>
-
-<p>0) Launch the game</p>
-<p>1) The Supercell logo appears</p>
-<p>2) The Loading screen appears</p>
-<p>3) Game assets are loaded</p>
-<p>4) If the generated signature does not match the signature in the CSV file, the game will redownload the CSV file, replace it, and restart the game.</p>
-<p>5) Once the game has restarted, it will load properly.</p>
-
-<p>
-Sounds fool proof, right? It did to me, until I stumbled across a bypass. Here's the issue - when the signature doesn't match and the game downloads the new CSV file, it assumes whatever is loaded next is clean and matches the signature.
-</p>
-
-<p>
-When Clash of Clans attempts to overwrite the old files or download new unmodified files if any of those actions are prevented the game will assume the CSV files are clean after the game restarts. Various bypasses include blocking the download, disconnecting the internet, locking the device, etc. Locking the device proved to be the easiest method, and it could be automated with Lua scripts.
-</p>
-
-<p>
-The entire signature check could be bypassed by: patching the files, launching the game, locking the device when the Supercell logo appears, and then unlocking the device and letting the game launch.
-<p>
-
-<p>
-Upon the first launch the game will invalidate the CSV files, but since the device is locked it won't download them. When the device is unlocked, the game restarts itself and loads the patched CSV files. Locking the device is the easiest method of preventing the files from redownloading, but any method of preventing new files from being downloaded or having the old ones overwritten will work.
-</p>
-
-<p>
-I traded this bypass and some knowledge of CSV mods to Supercell for a pretty cool bug bounty - some troop statues from various games, draw string bags, and Supercell plushies. Totally worth it, in my opinion. :)
-</p>
-
-<p>
-In April 2020, this bug was finally patched. Now, every time the loading screen appears it will check the files' signatures even after the game reloads. At the time of writing this, all CSV related mods have seemingly been abolished from the game - just in time for more tournaments.
-</p>
-
-<br>
-<center><img src="Pics/bounty.jpg" alt="Image" height="1008" width="756"></center>
-
+<br><h1>Breaking the Trust - Manipulating asset files in Supercell games</h1>
+<i>June 1, 2020</i>
+<p>In Supercell games, asset files are stored as .csv files for general information used in the game while .sc files contain the graphics. All .csv file contents are stored as primitive data types (int, bool, String, etc). Prior to December of 2019, for over 7 years after Clash of Clans' launch, asset files were not scanned by the game for modification or signed to check integrity. The implications of this being that any user could write their own edits into the .csv files and load them into the game. Most data stored in the .csv files is checked against the server, so trying to modify an achievement and getting 9 million gems for completing it will cause the game to "Out of Sync" and reset since the client calculations are different than what the server expected. Although this system is mostly bulletproof, occasionally a few bugs slip through the cracks.</p>
+<a href="CSV/csv.html">Continue reading...</a><hr>
+</div>
 
 </head>
 </html>
