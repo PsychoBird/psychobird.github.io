@@ -1,15 +1,15 @@
 <html>
 <head>
-    
-<title>SearchKit & RevelariOS - Digging through app memory on iOS</title>
+
+<title>SearchKit & RevelariOS - Through the vm_region()</title>
 <body style="font-family:'Helvetica'">
-    
+
 
 <style>
     code.indent{
         padding-left: 1.8em
     }
-    
+
     div {
       background-color: clear;
       width: 60%;
@@ -18,8 +18,16 @@
       margin: auto;
     }
 
+    ind {
+        text-indent: 50px;
+    }
+
     body {
         font-size: 17px;
+    }
+    mark {
+        background-color: lightgray;
+        color: black;
     }
 </style>
 
@@ -27,14 +35,290 @@
 
 <center>
 <h1>SearchKit & RevelariOS</h1>
-<p>Digging through app memory on iOS</p><br>
-<i>by PsychoBird - June 1, 2020</i><hr>
+<p>Taking a dive into the vm_region()</p><br>
+<i>by PsychoBird - September 28, 2020</i><hr>
 </center>
 
 <h2>Introduction</h2><hr>
 
 
-<p>There's plenty of tools related to searching memory on iOS such as GameGem or DLG Memory Injected which work excellently, but my goal was to make something slightly different. RevelariOS is a command line utility instead of a generic UI to greatly improve the chances 
+<p>
+    Searching through memory on iOS to find a specific value isn't a new idea. There's plenty of tools available for searching memory on iOS, and source code is available for most of them. However, the source code only explains the <i>how</i> behind the project but not the <i>why</i>. The goal of RevelariOS was to create a technical version of these tools with a <i>how</i> and <i>why</i> explaination available through a combination of this blog post and the source code. SearchKit is meant to be a development toolkit so developers can add memory searching in their own projects, while RevelariOS is built to show off the power of SearchKit and its potential uses in research and development. In order to explain how RevelariOS and similar programs work, we have to take a dive into the vm_region().
+</p>
+
+<p>
+    Before beginning, let's discuss the logical process behind searching memory. First, we'll need to find the exact memory region we're searching. We can't start at 0x0 and search up until we hit our desired result because the searching process would take hours, espeically if our input is not actually in memory and we end up searching until iOS won't let us anymore. Secondly, we'll need to read the valid memory regions we find for our input. Reading must be efficient or else searches will take way too long to be usable. Lastly, we'll need a medium for storing the addresses of where the memory scanner found a match.
+</p>
+
+<h2>
+    Pt. 1 - Getting the searchable region from vm_region()
+</h2><hr>
+
+<p>
+    The searcable region of memory is different for each device, so we can't find the searchable region on one device, hard code it into the tool, and expect it to work on others. Fortunately, we can implement a function to find the base and end address through <code>vm_region()</code>.
+</p>
+
+<p>
+    Because Apple doesn't provide much documentation for internal functions, we'll need to look at the <a href="http://web.mit.edu/darwin/src/modules/xnu/osfmk/man/vm_region.html">MIT Mach IPC Documentation</a> for <code>vm_region()</code>:
+</p>
+
+<p><small>
+    <code>kern_return_t vm_region<br>
+                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(vm_task_t                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;target_task,<br>
+                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_address_t                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;address,<br>
+                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_size_t                          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;size,<br>
+                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_region_flavor_t                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;flavor,<br>
+                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_region_info_t                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;info,<br>
+                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mach_msg_type_number_t        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;info_count,<br>
+                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;memory_object_name_t         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;object_name);<br>
+    </code>
+</small></p>
+
+
+<p>
+    Since we're building this for newer devices, we'll need to use <code>vm_region_64()</code>. Since there is no documentation yet (that's something I may get to) for updated mach functions, the code below had to be strung together using the XNU source code as a reference.
+</p>
+
+<p><small>
+    <code>
+        kern_return_t get_region_size(mach_port_t task, vm_address_t *baseaddr, vm_address_t *endaddr) {<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_address_t addr = 0;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_size_t size = 0;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_region_flavor_t flavor = VM_REGION_BASIC_INFO_64;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_region_basic_info_data_64_t info;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mach_port_t object = 0;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;kern_return_t kret;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int id = 0;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bool found = false;<br><br>
+
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while (1) {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;addr += size;<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;kret = vm_region_64(task, &addr, &size, flavor, (vm_region_info_64_t) &info, &count, &object);<br><br>
+
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (kret != KERN_SUCCESS) {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break; }<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else if (id < 3 && kret != KERN_SUCCESS) {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return KERN_FAILURE; }<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;id++;<br><br>
+
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (addr > 0 && !found) {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;found = true;<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*baseaddr = addr;<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br><br>
+
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*endaddr = addr;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return KERN_SUCCESS;<br>
+        }
+    </code>
+</small></p>
+
+<p>
+    The only parts of the above code that we need to focus on are <code>task</code>, <code>addr</code>, and <code>size</code>. The other <code>vm_region_64()</code> fields are not useful for what we're currently doing.
+</p>
+<p>
+    <code>task</code> is simply a send right to the task port we're searching in. For simplicity purposes I will be using "task" and "send right to the task port" interchangably. It doesn't matter <i>too much</i> what task we input for getting the searchable region because the range will mostly the same, but for the sake of making this blog post simple we're using the same task that we're searching in.
+</p>
+
+<p>
+    How do we get a send right to the task we're using throughout this process? There's a few ways, depending on what's needed.
+
+    To get the self task, assuming you're working with a dynamic library linked inside of a process / app or your own individual process, it's fairly simple:
+</p>
+
+<p>
+    <code>
+        <small>
+            /*<br>
+            get a send right of the task port of our own task<br>
+            note: mach_task_self() returns the send right to your task port<br>
+            */<br><br>
+            mach_port_t task = mach_task_self();
+        </small>
+    </code>
+</p>
+
+<p>
+    We don't need the <code>task-for-pid-allow</code> entitlement for getting the send right to our own task port. If we need a send right to a separate task, we'll need the <code>task-for-pid-allow</code> entitlement. Unfortunately, to sign a binary with that entitlement, we need to be jailbroken and sign it with <code>ldid</code> or have some sort of exploit. I was <i>seriously</i> considering bundling the RevelariOS app into a sideloadable IPA using the <a href="https://siguza.github.io/psychicpaper/">Psychic Paper</a> exploit by Siguza, but that's for another day. Anyway, here's the code using <code>task_for_pid()</code>:
+</p>
+
+
+<p><small>
+    <code>
+        //check if code is not run as root<br>
+        if (geteuid() && getuid()) {<br>
+            &nbsp;&nbsp;&nbsp;exit(-1);<br>
+        }<br><br>
+
+        mach_port_t task = MACH_PORT_NULL;<br>
+        kern_return_t kret; //return to determine if tfp() succeeded<br>
+        pid_t pid = 1;<br>
+        &nbsp;//process id (pid) 1 is launchd. Just use some sort of input method for your desired pid.<br><br>
+
+
+        kret = task_for_pid(mach_task_self(), pid, &task);<br>
+        if (kret != KERN_SUCCESS) {<br>
+            &nbsp;&nbsp;&nbsp;exit(-1);<br>
+        }<br>
+
+    </code>
+</p></small>
+
+<p>
+    <i>Finally,</i> we can move onto <code>vm_address_t addr</code>.
+</p>
+<p>
+    <code>vm_address_t addr</code> is the address of the first available valid region given to us by <code>vm_region_64()</code>. You may have noticed the <code>&</code> operator. I could be here forever explaining the & operator, so if you don't know what & means google "address of operator in C". Basically, it allows <code>vm_region_64()</code> to use the value of <code>addr</code> and change it. Once the function returns it'll spit out a new value for <code>addr</code> which we can use. I'll be referring to & as an in-pointer in these functions going forward.
+</p>
+<p>
+    <code>vm_size_t size</code> is an in-pointer which comes out as the size of the region at <code>addr</code>. As explained above, once <code>vm_region_64()</code> is executed a new value for <code>size</code> will be in place assuming it returns successfully.
+</p>
+
+<p>
+    If we input <code>addr = 0</code> and <code>size = 0</code> into <code>vm_region_64()</code>, we can get the address of the first valid region and its size. Once the function executes, let's say that <code>addr = 0x10086c000</code> and <code>size = 0x4000</code>. This means that the region found at <code>0x10086c000</code> is <code>0x4000</code>. Since <code>0x10086c000</code> is our first valid region, we'll set <code>*baseaddr</code> to <code>addr(0x10086c000)</code>
+</p>
+<p>
+    So how is this useful? We can add <code>addr += size</code> and loop through the code using an infinite <code>while (1)</code> loop. Since we're adding <code>size</code> to <code>addr</code>, the new <code>addr</code> value will be the start of the next valid region. This process is repeated until <code>vm_region_64()</code> doesn't return successfully.
+</p>
+<p>
+    The <code>size</code> of the region found by <code>vm_region_64()</code> can be variable and is often fairly large. For a searchable range of <code>0x10086c000 - 0x280000000</code>, <code>vm_region_64()</code> will only run a few dozen times. Once we attempt to search for a region at an invalid address, let's say <code>0x290000000</code>, <code>vm_region_64()</code> will return <code>KERN_INVALID_ADDRESS</code> and we will be kicked out of the while loop by hitting the <code>break</code>. Since <code>0x280000000</code> is the last address to a valid region, <code>*endaddr</code> will be set to <code>addr(0x280000000)</code>. The function will now return with our <code>*baseaddr</code> and <code>*endaddr</code> found.
+</p>
+
+<h2>
+    Pt. 2 - Reading our searchable region with vm_read_overwrite()
+</h2><hr>
+
+<p>
+    When reading back iOS memory in the searchable region, we'll need another logical start and end point. If we read back one byte at a time throughout our searchable region, the entire read process will take hours. If we don't pick the correct bounds to read back, the input that we're searching for may be cut off in between reads. So how can we read memory properly?
+</p>
+<p>
+    The easiest and most efficient way to start reading through iOS memory is through reading back a memory page at a time. Starting on A7 and A8 devices, memory pages have a 16kb <code>(0x4000)</code> size. We can read back a memory page as an array of bytes and compare our input to the read result one byte at a time. Although reading a byte at a time is slow, comparing it isn't. If our input isn't found, we can just increase the read region by one page size <code>(0x4000)</code> and restart the process. The start address of <code>baseaddr</code> will always start at a number divisible by the page size, so we don't need to worry about information being cut off between reads.
+</p>
+
+<p>
+    Here's a snippet of the function for searching:
+</p>
+
+<p><small>
+    <code>
+    typedef int search_t;<br>
+    typedef unsigned char byte_t;<br>
+    typedef uint8_t result_t;<br><br>
+
+    #define SEARCH_SUCCESS 0<br>
+    #define SEARCH_FAILURE 1<br><br>
+
+    #define READ_PAGE_SIZE getpagesize()<br><br>
+
+search_t search_data(mach_port_t task, vm_address_t baseaddr, vm_address_t endaddr, vm_address_t *outaddr, uint8_t cmpbyte[100]) {<br><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;size_t bytes = READ_PAGE_SIZE;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;byte_t readOut[READ_PAGE_SIZE];<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;kern_return_t kret;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int accuracy = 0;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unsigned long scannum = 20;<br><br>
+
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for (; baseaddr < endaddr; baseaddr+=READ_PAGE_SIZE) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;kret = vm_read_overwrite(task, baseaddr, bytes, (vm_offset_t) &readOut, (vm_size_t*) &bytes);<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int i;<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for (i=0; i < READ_PAGE_SIZE; i++) {<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (kret != KERN_SUCCESS) {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;accuracy = 0;<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (cmpbyte[0] == readOut[i]) {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;accuracy++;<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for (int j=(i+0x1); j&lt;READ_PAGE_SIZE; j++) {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (cmpbyte[accuracy] == (uint8_t) readOut[j]) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;accuracy++;<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (accuracy == scannum) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*outaddr = (vm_address_t*) baseaddr + i;<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return SEARCH_SUCCESS;<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return SEARCH_FAILURE;<br>
+}
+    </code>
+</p></small>
+
+<p>
+    This function has been thinned down; the full version of the search function is available on the <a href="https://github.com/PsychoBird/RevelariOS/blob/master/SearchKit/SearchKit.h#L55">GitHub repository</a> for SearchKit / RevelariOS. The only major difference between the code snippet above and the real function is that we search for 255 total addresses and that the input formatter hasn't been removed.
+</p>
+
+
+<p>
+    Let's start by looking at the code from the beginning. The typedefs <code>result_t (uint8_t)</code>, <code>byte_t (unsigned char)</code> and <code>search_t (int)</code> are simply added for readability.
+</p>
+<p>
+    <code>READ_PAGE_SIZE getpagesize()</code> is the page size of the device. As mentioned above, for my device the page size is <code>0x4000</code>.
+</p>
+
+<p>
+    Since the above code is abbreviated and only an example, I set <code>unsigned long scannum</code> to 20. That just assumes that our input length (<code>uint8_t cmpbyte[100]</code>) is 20 bytes. This is normally handled by getting the length of the input through the formatter in the real function.
+</p>
+
+<p>
+    <code>byte_t readOut[READ_PAGE_SIZE]</code> is where we're storing the memory page we read and <code>size_t bytes</code> is the amount of bytes we'll be reading. (one memory page)
+</p>
+
+<p>
+    <code>int accuracy = 0</code> is a counter to see if the bytes read back match the <code>cmpbyte[]</code>. Since we loop through <code>readOut[]</code> one byte at a time and compare it to <code>cmpbyte[]</code>, when the bytes match we increment <code>accuracy</code> and if it doesn't match we set it back to 0.
+</p>
+<p>
+    We start our <code>for</code> loop by beginning at <code>baseaddr</code> and looping all the way to <code>endaddr</code>. If our comparisons inside of the <code>for</code> loop are not met, we add <code>READ_PAGE_SIZE</code> to <code>baseaddr</code> and start searching at the beginning of the next memory page.
+</p>
+
+<p>
+    Next, we run <code>vm_read_overwrite</code>. Here is the function declaration, courtesy of the MIT Documentation:
+</p>
+
+<p><small>
+    <code>
+        kern_return_t   vm_read_overwrite<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(vm_task_t                          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;target_task,<br>
+                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_address_t                           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;address,<br>
+                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_size_t                                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;size,<br>
+                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pointer_t                              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data_in,<br>
+                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;target_task                         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data_count);<br>
+    </code>
+</p></small>
+
+
+<p>
+    Previously in the blog post I described what goes into <code>target_task</code> (or <code>task</code>) and its meaning, so let's move onto <code>address</code>. We enter <code>baseaddr</code> into the <code>address</code> field to signify that we're starting our read at that page of memory. <code>size</code> is where we enter our variable <code>bytes</code> - that's just the size of the region we're searching, which, once again, is one memory page. Lastly, <code>data_in</code> is a in-pointer to the array <code>readOut</code> where our read bytes will be stored.
+</p>
+
+<p>
+    Next, we enter the <code>for</code> loop with the iterator <code>i</code> that increases by one until it reaches <code>READ_PAGE_SIZE</code>. If <code>vm_read_overwrite()</code> fails and doesn't equal <code>KERN_SUCCESS</code>, we <code>break</code> the <code>for</code> loop so we don't waste time comparing garbage data.
+</p>
+
+<p>
+    Inside of the same loop we set <code>accuracy</code> to 0 and compare the first byte of our input (<code>cmpbyte[0]</code>) to the byte at <code>readOut[i]</code>. If the values are equal, <code>accuracy</code> is increased by 1 and we enter another <code>for</code> loop with the iterator <code>j</code>. This iterator is set to the value of <code>i+1</code> so we don't accidentally compare the same bytes twice. Immediately after initializing the loop, <code>cmpbyte[accuracy]</code> is compared to <code>readOut[j]</code>. If the values are equal, <code>accuracy</code> is increased by 1 once again. If they're not equal, we <code>break</code> out of the loop and go back to comparing bytes. This loop will continue until <code>accuracy</code> equals <code>scannum</code>, which in this example is 20. Once they're both equal, we know that our input has been found successfully and that <code>*outaddr</code> can be set to <code>baseaddr+i</code>, which is the address of where the input matched an array of bytes read from memory. The function then returns <code>SEARCH_SUCCESS</code>. If no matching bytes are found, the function returns <code>SEARCH_FAILURE</code>.
+</p>
+
+<h2>
+    Conclusion (pt. 3) - RevelariOS and using the result addresses
+</h2><hr>
+
+<p>
+    So we did all of this work, but for what? What usage does a bunch of addresses found in memory actually have?
+</p>
+
+<p>
+    For usage, let's look at <a href="https://github.com/PsychoBird/RevelariOS">RevelariOS</a>, which is SearchKit wrapped inside of a tool I developed. RevelariOS is a command line utility and an iOS appication for searching memory. With it, we can find information from memory by searching for through the command line or inside of the app. Trying to find instances of string in memory? RevelariOS can do that. Want to find pointers that hold a specific address? RevelariOS can do that. As mentioned before, the full version of the function <code>search_data</code> supports up to 255 result addresses. That number can be increased to 65536, but it is only useful in some scenarios. For example, holding that many addresses means that we can track down every instance of a loaded mach-o binary in memory by searching for <code>0xfeedfacf</code>, the mach-o magic number. Just make sure that the header is in Little Endian! Finding where binaries are loaded can be used for dumping applications, for example. The only real limitations of RevelariOS / SearchKit are your imagination. I've used it countless times in my own research.
+</p>
+
+<p>
+    RevelariOS was developed to show off the power of SearchKit. It can also read / write memory and pause our searching task, making it a multi purpose utility. If you made it this far, I recommend checking out the <a href="https://github.com/PsychoBird/RevelariOS">GitHub repository</a> for RevelariOS. You might be able to find it useful for yourself or even develop it further. Innovation breeds from sharing ideas. :)
+</p>
+
 
 </div>
 
