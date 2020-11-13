@@ -1,0 +1,66 @@
+<html>
+<head>
+
+<title>Project Endocarp | vm_write()</title>
+<body style="font-family:'Helvetica'">
+
+
+<style>
+    code.indent{
+        padding-left: 1.8em
+    }
+
+    div {
+      background-color: clear;
+      width: 90%;
+      border: 15px clear;
+      padding: 50px;
+      margin: auto;
+    }
+
+    body {
+        font-size: 17px;
+    }
+    mark {
+        background-color: lightgray;
+        color: black;
+    }
+</style>
+
+<div>
+
+<center>
+    <h1>vm_write()</h1><hr>
+    <P><a href="http://web.mit.edu/darwin/src/modules/xnu/osfmk/man/vm_write.html">MIT Documentation for vm_write()</a></p><hr>
+</center>
+
+<h2>Example</h2>
+
+<code><small>
+/*<br>
+write to task's address space<br>
+
+*/<br><br>
+
+vm_address_t address = 0x10086c000;<br>
+uint8_t data[] = {0x00, 0x00, 0x00, 0x00};<br>
+vm_size_t size = 4;<br><br>
+
+kern_return_t kret;<br><br>
+
+kret = vm_write(mach_task_self(), //task for to write data<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;address, //address to write data at<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(vm_offset_t) &data, //bytes for writing<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;size); //size of data<br><br>
+
+if (kret != KERN_SUCCESS) {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return kret;<br>
+}<br>
+return KERN_SUCCESS;<br>
+
+</small></code>
+
+
+</div>
+</head>
+</html>

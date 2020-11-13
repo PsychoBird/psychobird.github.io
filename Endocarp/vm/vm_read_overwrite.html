@@ -1,0 +1,67 @@
+<html>
+<head>
+
+<title>Project Endocarp | vm_read_overwrite()</title>
+<body style="font-family:'Helvetica'">
+
+
+<style>
+    code.indent{
+        padding-left: 1.8em
+    }
+
+    div {
+      background-color: clear;
+      width: 90%;
+      border: 15px clear;
+      padding: 50px;
+      margin: auto;
+    }
+
+    body {
+        font-size: 17px;
+    }
+    mark {
+        background-color: lightgray;
+        color: black;
+    }
+</style>
+
+<div>
+
+<center>
+    <h1>vm_read_overwrite()</h1><hr>
+    <P><a href="http://web.mit.edu/darwin/src/modules/xnu/osfmk/man/vm_read.html">MIT Documentation for vm_read_overwrite()</a></p><hr>
+</center>
+
+<h2>Example</h2>
+
+<code><small>
+/*<br>
+read out from task's address space<br>
+*/<br><br>
+
+vm_address_t address = 0x10086c000;<br>
+uint8_t read_buffer[4];<br>
+vm_size_t size = 4;<br><br>
+
+kern_return_t kret;<br><br>
+
+kret = vm_read_overwrite(mach_task_self(), //task for reading in <br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;address, //address where read begins<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;size, //in size of read<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(vm_offset_t) read_buffer, //where data will be read to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&size); // out size<br><br>
+
+if (kret != KERN_SUCCESS) {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return kret;<br>
+}<br>
+
+return KERN_SUCCESS;<br>
+
+</small></code>
+
+
+</div>
+</head>
+</html>

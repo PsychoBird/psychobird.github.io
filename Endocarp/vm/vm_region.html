@@ -1,0 +1,80 @@
+<html>
+<head>
+
+<title>Project Endocarp | vm_region()</title>
+<body style="font-family:'Helvetica'">
+
+
+<style>
+    code.indent{
+        padding-left: 1.8em
+    }
+
+    div {
+      background-color: clear;
+      width: 90%;
+      border: 15px clear;
+      padding: 50px;
+      margin: auto;
+    }
+
+    body {
+        font-size: 17px;
+    }
+    mark {
+        background-color: lightgray;
+        color: black;
+    }
+</style>
+
+<div>
+
+<center>
+    <h1>vm_region()</h1><hr>
+    <P><a href="http://web.mit.edu/darwin/src/modules/xnu/osfmk/man/vm_region.html">MIT Documentation for vm_region()</a></p><hr>
+</center>
+
+<h2>Example</h2>
+
+<code><small>
+/*<br>
+returns information about closest region to input address<br>
+other information such as protection is included in "info"<br>
+*/<br><br>
+
+vm_address_t address = 0;<br>
+vm_size_t size = 0;<br>
+vm_region_flavor_t flavor = VM_REGION_BASIC_INFO;<br>
+vm_region_basic_info_data_t info;<br>
+mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT;<br>
+mach_port_t object = 0;<br>
+kern_return_t kret;<br><br>
+
+kret = vm_region(mach_task_self(), &address, &size, flavor, (vm_region_info_t) &info, &count, &object);<br><br>
+
+printf("Nearest region at address: 0x%lx\n", address);<br>
+printf("Size of region at address [0x%lx]: 0x%x\n", address, size);<br><br>
+printf("Protection (Get info from bit flags): 0x%x\n", info.protection);<br>
+printf("Max Protection (Get info from bit flags): 0x%x\n", info.max_protection);<br>
+printf("Inheritance: %d\n", info.inheritance);<br>
+printf("Shared (t/f): %d\n", info.shared);<br>
+printf("Reserved (t/f): %d\n", info.reserved);<br>
+printf("Offset (uint32_t): 0x%x\n", info.offset);<br>
+printf("Behavior: %d\n", info.behavior);<br>
+printf("User wired count: %d\n", info.user_wired_count);<br><br>
+
+if (kret != KERN_SUCCESS) {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return kret;<br>
+}<br>
+return KERN_SUCCESS;
+
+</small></code>
+
+<h2>Notes</h2>
+
+<p>vm_region is exclusively meant for 32bit devices. See <a href="vm_region_64.html">vm_region_64()</a> for 64bit devices.</p>
+
+
+</div>
+</head>
+</html>

@@ -1,0 +1,127 @@
+<html>
+<head>
+
+<title>Project Endocarp | vm_region_recurse()</title>
+<body style="font-family:'Helvetica'">
+
+
+<style>
+    code.indent{
+        padding-left: 1.8em
+    }
+
+    div {
+      background-color: clear;
+      width: 90%;
+      border: 15px clear;
+      padding: 50px;
+      margin: auto;
+    }
+
+    body {
+        font-size: 17px;
+    }
+    mark {
+        background-color: lightgray;
+        color: black;
+    }
+</style>
+
+<div>
+
+<center>
+    <h1>vm_region_recurse()</h1><hr>
+</center>
+
+<h2>Function</h2>
+<p>vm_region_recurse: A form of vm_region which follows the submaps in a target map (xnu source)</p>
+
+<code><small>
+kern_return_t vm_region_recurse(<br>
+    	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_map_t			map,<br>
+    	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_address_t			*address,<br>
+    	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_size_t			*size,<br>
+    	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;uint32_t			*depth,<br>
+    	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_region_recurse_info_t	info,<br>
+    	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mach_msg_type_number_t 	*infoCnt)<br>
+</code></small>
+
+<h2>Parameters</h2>
+
+<code>map</code><br>
+&nbsp;&nbsp;&nbsp;&nbsp;The high-level address map data structure (xnu source)<br><br>
+
+<code>*address</code><br>
+&nbsp;&nbsp;&nbsp;&nbsp;(in/out) address of closest region found to input<br><br>
+
+<code>*size</code><br>
+&nbsp;&nbsp;&nbsp;&nbsp;(out) size of region at address<br><br>
+
+<code>*depth</code><br>
+&nbsp;&nbsp;&nbsp;&nbsp;(in/out) recurse count (?)<br><br>
+
+<code>info</code><br>
+&nbsp;&nbsp;&nbsp;&nbsp;(in/out) [in] - type of info to be collected [out] - data returned at region<br><br>
+
+<code>*infoCnt</code><br>
+&nbsp;&nbsp;&nbsp;&nbsp;(in/out) size of info buffer<br><br>
+
+<h2>Return Values</h2>
+<p>
+    <b>KERN_INVALID_ARGUMENT</b> - Function argument is invalid<br>
+    <b>KERN_INVALID_ADDRESS</b> - Invalid target address provided
+</p>
+
+<h2>Example</h2>
+
+<code><small>
+/*<br>
+gain information about region<br>
+
+*/<br><br>
+
+vm_address_t address = 0;<br>
+vm_size_t size = 0;<br>
+uint32_t depth = 0;<br>
+vm_region_submap_info_data_t info;<br>
+mach_msg_type_number_t count = VM_REGION_SUBMAP_INFO_COUNT;<br>
+kern_return_t kret;<br><br>
+
+vm_region_recurse(mach_task_self(), &address, &size, (vm_region_submap_info_t) &depth, &info, &count);<br><br>
+
+printf("Nearest region at address: 0x%lx\n", address);<br>
+printf("Size of region at address [0x%lx]: 0x%x\n", address, size);<br>
+printf("Depth: 0x%x\n", depth);<br>
+printf("Protection (Get info from bit flags): 0x%x\n", info.protection);<br>
+printf("Max Protection (Get info from bit flags): 0x%x\n", info.max_protection);<br>
+printf("Inheritance: %d\n", info.inheritance);<br>
+printf("Offset: 0x%x\n", info.offset);<br>
+printf("User Tag: %d\n", info.user_tag);<br>
+printf("Pages Resident: %d\n", info.pages_resident);<br>
+printf("Pages Shared Now Private: %d\n", info.pages_shared_now_private);<br>
+printf("Pages Swapped Out: %d\n", info.pages_swapped_out);<br>
+printf("Pages Dirtied: %d\n", info.pages_dirtied);<br>
+printf("Reference Count: %d\n", info.ref_count);<br>
+printf("Shadow Depth: %d\n", info.shadow_depth);<br>
+printf("External Pager: %d\n", info.external_pager);<br>
+printf("Share Mode: %d\n", info.share_mode);<br>
+printf("Is Submap (t/f): %d\n", info.is_submap);<br>
+printf("Behavior: %d\n", info.behavior);<br>
+printf("Object ID: 0x%x\n", info.object_id);<br>
+printf("User wired count: %d\n", info.user_wired_count);<br><br>
+
+if (kret != KERN_SUCCESS) {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return kret;<br>
+}<br>
+return KERN_SUCCESS;
+
+</small></code>
+
+<h2>Notes</h2>
+
+<p>Check <a href="vm_region.html">vm_region()</a>  for other usage.</p>
+
+
+</div>
+</head>
+</html>

@@ -1,0 +1,64 @@
+<html>
+<head>
+
+<title>Project Endocarp | host_page_size()</title>
+<body style="font-family:'Helvetica'">
+
+
+<style>
+    code.indent{
+        padding-left: 1.8em
+    }
+
+    div {
+      background-color: clear;
+      width: 90%;
+      border: 15px clear;
+      padding: 50px;
+      margin: auto;
+    }
+
+    body {
+        font-size: 17px;
+    }
+    mark {
+        background-color: lightgray;
+        color: black;
+    }
+</style>
+
+<div>
+
+<center>
+    <h1>host_page_size()</h1><hr>
+    <P><a href="http://web.mit.edu/darwin/src/modules/xnu/osfmk/man/host_page_size.html">MIT Documentation for host_page_size()</a></p><hr>
+</center>
+
+<h2>Example</h2>
+
+<code><small>
+/*<br>
+return host page size<br>
+will return 16k (0x4000) >= iOS 9<br>
+*/<br><br>
+
+vm_size_t size = 0;<br>
+kern_return_t kret;<br><br>
+
+kret = host_page_size(mach_host_self(), &size);<br>
+printf("Host Page Size: 0x%x\n", size);<br><br>
+
+if (kret != KERN_SUCCESS) {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return kret;<br>
+}<br>
+return KERN_SUCCESS;
+
+</small></code>
+
+<h2>Notes</h2>
+
+<p>On iOS 9 and above host_page_size will return 16,384b (0x4000).
+
+</div>
+</head>
+</html>

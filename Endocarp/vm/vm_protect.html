@@ -1,0 +1,71 @@
+<html>
+<head>
+
+<title>Project Endocarp | vm_protect()</title>
+<body style="font-family:'Helvetica'">
+
+
+<style>
+    code.indent{
+        padding-left: 1.8em
+    }
+
+    div {
+      background-color: clear;
+      width: 90%;
+      border: 15px clear;
+      padding: 50px;
+      margin: auto;
+    }
+
+    body {
+        font-size: 17px;
+    }
+    mark {
+        background-color: lightgray;
+        color: black;
+    }
+</style>
+
+<div>
+
+<center>
+    <h1>vm_protect()</h1><hr>
+    <P><a href="http://web.mit.edu/darwin/src/modules/xnu/osfmk/man/vm_protect.html">MIT Documentation for vm_protect()</a></p><hr>
+</center>
+
+<h2>Example</h2>
+
+<code><small>
+/*<br>
+set protect of region of virtual memory<br>
+size can be obtained through vm_region<br>
+*/<br><br>
+
+vm_address_t address = 0x10086c000;<br>
+vm_size_t size = 0x4000;<br><br>
+
+kern_return_t kret;<br><br>
+
+vm_protect(mach_task_self(),<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;address,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;size,<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;false, // not setting the max protection as the next field (VM_PROT_READ | VM_PROT_EXECUTE)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;VM_PROT_READ | VM_PROT_EXECUTE); // virtual memory protections<br><br>
+
+if (kret != KERN_SUCCESS) {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return kret;<br>
+}<br>
+return KERN_SUCCESS;
+
+</small></code>
+
+<h2>Notes</h2>
+
+<p>All available protections are VM_PROT_NONE (0x0), VM_PROT_READ (0x1), VM_PROT_WRITE (0x2), VM_PROT_EXECUTE(0x4), VM_PROT_NO_CHANGE (0x8), VM_PROT_COPY (0x10), VM_PROT_WANTS_COPY (0x10)</p>
+<p>Protections are handled as bit flags. Default protection is VM_PROT_DEFAULT(VM_PROT_READ | VM_PROT_WRITE)</p>
+
+
+</div>
+</head>
+</html>
