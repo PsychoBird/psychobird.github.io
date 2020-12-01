@@ -1,0 +1,68 @@
+<html>
+<head>
+
+<title>Project Endocarp | vm_region_extended_info</title>
+<body style="font-family:'Helvetica'">
+
+
+<style>
+    code.indent{
+        padding-left: 1.8em
+    }
+
+    div {
+      background-color: clear;
+      width: 90%;
+      border: 15px clear;
+      padding: 50px;
+      margin: auto;
+    }
+
+    body {
+        font-size: 17px;
+    }
+    mark {
+        background-color: lightgray;
+        color: black;
+    }
+</style>
+
+<div>
+
+<center>
+    <h1>vm_region_extended_info</h1><hr>
+</center>
+
+<h2>Struct</h2>
+<p>vm_region_recurse_64: A form of vm_region which follows the submaps in a target map (xnu source)</p>
+
+<code><small>
+struct vm_region_extended_info {<br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vm_prot_t		protection;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unsigned int            user_tag;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unsigned int            pages_resident;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unsigned int            pages_shared_now_private;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unsigned int            pages_swapped_out;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unsigned int            pages_dirtied;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unsigned int            ref_count;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unsigned short          shadow_depth;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unsigned char           external_pager;<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unsigned char           share_mode;<br>
+};
+
+</code></small>
+
+<h2>Struct Fields</h2>
+
+<code>map</code><br>
+&nbsp;&nbsp;&nbsp;&nbsp;The high-level address map data structure (xnu source)<br><br>
+
+
+<h2>Notes</h2>
+
+<p>Check <a href="vm_region_64.html">vm_region_64()</a>  for other usage.</p>
+
+
+</div>
+</head>
+</html>

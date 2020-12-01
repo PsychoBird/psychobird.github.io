@@ -1,0 +1,68 @@
+<html>
+<head>
+
+<title>Project Endocarp | vm_allocate()</title>
+<body style="font-family:'Helvetica'">
+
+
+<style>
+    code.indent{
+        padding-left: 1.8em
+    }
+
+    div {
+      background-color: clear;
+      width: 90%;
+      border: 15px clear;
+      padding: 50px;
+      margin: auto;
+    }
+
+    body {
+        font-size: 17px;
+    }
+    mark {
+        background-color: lightgray;
+        color: black;
+    }
+</style>
+
+<div>
+
+<center>
+    <h1>vm_allocate()</h1><hr>
+    <P><a href="http://web.mit.edu/darwin/src/modules/xnu/osfmk/man/vm_allocate.html">MIT Documentation for vm_allocate()</a></p><hr>
+</center>
+
+<h2>Example</h2>
+
+<code><small>
+/*<br>
+allocate memory for task in virtual memory<br>
+if the last field is false it will allocate memory at *address<br>
+if true it will allocate memory at first available page boundary and return value for *address<br>
+
+*/<br><br>
+
+vm_address_t address;<br>
+vm_size_t size = getpagesize();<br><br>
+
+kern_return_t kret;<br><br>
+
+kret = vm_allocate(mach_task_self(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&address, //address of allocation or out pointer where vm_allocate will allocate<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;size,  // size of page size<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;true); //true means it will allocate at any available page bound. false will allocate at vm_address_t address.<br><br>
+
+if (kret != KERN_SUCCESS) {<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return kret;<br>
+}<br><br>
+
+printf("Allocated memory at 0x%lx\n", address);<br>
+return KERN_SUCCESS;
+
+</small></code>
+
+</div>
+</head>
+</html>

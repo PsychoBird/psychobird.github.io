@@ -25,15 +25,31 @@ kern_return_t vm_region_recurse_64(
 */
 
 int main() {
+    vm_address_t address;
+    vm_size_t size = getpagesize();
 
-    vm_size_t size = 0;
     kern_return_t kret;
 
-    kret = host_page_size(mach_host_self(), &size);
-    printf("Host Page Size: 0x%x\n", size);
+    kret = vm_allocate(mach_task_self(),
+                        &address, //address of allocation or out pointer where vm_allocate will allocate
+                        size,  // size of page size
+                        true); //true means it will allocate at any available page bound. false will allocate at vm_address_t address.
 
     if (kret != KERN_SUCCESS) {
-         return kret;
+        printf("Exit with error: %s\n", mach_error_string(kret));
+        return kret;
     }
+
+    printf("Allocated memory at 0x%lx\n", address);
+    kret = vm_deallocate(mach_task_self(),
+                        address, //address of allocation by vm_allocate
+                        size); //size of allocation (page size)
+
+    if (kret != KERN_SUCCESS) {
+        printf("Exit with error: %s\n", mach_error_string(kret));
+        return kret;
+    }
+
+    printf("Deallocated memory allocated at 0x%lx\n", address);
     return 0;
 }
