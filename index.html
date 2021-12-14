@@ -34,8 +34,7 @@
 <p>
 <b><a href="https://github.com/PsychoBird/RevelariOS">RevelariOS</a></b> - A technical memory scanning tool and document for developers<br>
 <b><a href="https://github.com/PsychoBird/Capere">Capere</a></b> - An Apple Silicon hooking library written in C<br>
-<b><a href="https://github.com/PsychoBird/sdbg">sdbg</a></b> - A Memory Introspection Tool for iOS ("debugger")<br>
-<b><a href="https://github.com/PsychoBird/PixelBase">PixelBase</a></b> - A minimalistic Clash of Clans village generator<br>
+<b><a href="https://github.com/PsychoBird/Machium">Machium</a></b> - A debugger for iOS<br>
 </p>
 <hr>
 
@@ -45,6 +44,13 @@
 <p>Project Endocarp's goal is to update the <a href="http://web.mit.edu/darwin/src/modules/xnu/osfmk/man/">MIT Mach IPC Documentation</a> with the updated mach_*_64 functions and to provide usage examples for most functions. A detailed and updated documentation would have aided in the development of my projects, so I'm launching Project Endocarp for others to more easily learn and code.</p>
 <a href="Endocarp/Endocarp.html">Go to the project page</a><hr>
 -->
+<br><h1>Machium - The ARM "Apple Silicion" Debugger</h1>
+<i>December 9, 2021</i>
+<p>Honors projects are an excellent excuse to complete projects that have been sitting on a to-do list for a while. After all, when you're given an excuse to make anything, why not take the opportunity to build what you want?
+<br><br>
+My mind immediately went to a project I've wanted to create for a while. I've used debuggers a million times, but I never really understood how they worked. Of course, it's easy to just google "how do debuggers work", but that's not really fun, is it? Also - I forgot to add an important detail. I wanted to know how ARM debuggers work, which is a lot more niche than debugging on x86. Wait, scratch that. I wanted to know how ARM debuggers work on iOS, or as Tim Cook would like you to say, debugging on Apple Silicion. Are there even any resources out there on the internet to help with that? Let's find out and take a trap filled journey (pun intended) into debugging Apple Silicion.</p>
+<a href="Machium/Machium.html">Continue reading...</a><hr>
+
 <br><h1>SearchKit & RevelariOS - Taking a dive into the vm_region()</h1>
 <i>September 28, 2020</i>
 <p>Searching through memory on iOS to find a specific value isn't a new idea. There's plenty of tools available for searching memory on iOS, and source code is available for most of them. However, the source code only explains the <i>how</i> behind the project but not the <i>why</i>. The goal of RevelariOS was to create a technical version of these tools with a <i>how</i> and <i>why</i> explaination available through a combination of this blog post and the source code. SearchKit is meant to be a development toolkit so developers can add memory searching in their own projects, while RevelariOS is built to show off the power of SearchKit and its potential uses in research and development. In order to explain how RevelariOS and similar programs work, we have to take a dive into the vm_region().</p>

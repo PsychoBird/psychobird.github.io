@@ -1,0 +1,234 @@
+<html>
+<head>
+
+<title>Machium Debugger</title>
+<body style="font-family:'Helvetica'">
+
+
+<style>
+    code.indent{
+        padding-left: 1.8em
+    }
+
+    div {
+      background-color: clear;
+      width: 60%;
+      border: 15px clear;
+      padding: 50px;
+      margin: auto;
+    }
+
+    body {
+        font-size: 17px;
+    }
+
+</style>
+
+<div>
+<center>
+<code><a href="https://github.com/PsychoBird/Machium/blob/main/ent.xml">Machium Source Code</a></code><hr>
+<h1>Machium - The ARM "Apple Silicion" Debugger</h1>
+<p>Let's build a a debugger for iOS</p>
+<i>by PsychoBird - December 9, 2021</i><hr>
+</center>
+
+<h2>Introduction</h2><hr>
+<br>
+Honors projects are an excellent excuse to complete projects that have been sitting on a to-do list for a while.
+After all, when you're given an excuse to make anything,
+why not take the opportunity to build what you want?
+<br><br>
+My mind immediately went to a project I've wanted to create for a while.
+I've used debuggers a million times, but I never really understood how they worked.
+Of course, it's easy to just google "how do debuggers work", but that's not really fun, is it?
+Also - I forgot to add an important detail. I wanted to know how ARM debuggers work, which is a lot more niche than debugging on x86.
+Wait, scratch that. I wanted to know how ARM debuggers work on iOS, or as Tim Cook would like you to say, debugging on Apple Silicion.
+Are there even any resources out there on the internet to help with that?
+Let's find out and take a trap filled journey (pun intended) into debugging Apple Silicion.
+
+<h2>Part 1. Ignorance is Bliss</h2><hr>
+<br>
+I won't lie to you - I had a general idea of how a debugger would be created when going into this project.
+I figured I could just <code>ptrace()</code> my way through this entire project and add some memory writing / reading after I'm done.
+Nothing is that easy though, and what's unfortunate is that I found that out <i>wayyyyy</i> too late into the process of making this project.
+
+<br><br>
+I let a few weeks pass and once I finally accomplished all "UI" features, I decided to work on the debugger.
+During that time, I came up with the name "Machium" which joins the name of the Mach microkernel and "brachium", meaning arm in Latin.
+Once I came up with the most important part of a project, the name, I went to work trying to build the debugger core.
+My immediate thought was to start playing around with <code>ptrace(PTRACE_ATTACH)</code> and working from that function to access
+registers, set breakpoints, and pause / continue the target process. My thinking process was quickly detoured and my dreams were squashed in the span of a few minutes due to an issue I found.
+
+<br><br>
+I googled "ptrace xnu" and found the documentation page for ptrace and discovered that the header for ptrace is <code><sys/ptrace.h></code>.
+As one would, I went and included that file in my project and noticed that the header didnt exist and <code>ptrace()</code> couldn't be found.
+I struggled with this problem for a few minutes and then stumbled across a StackOverflow article that revealed the bad news to me.
+Apple, in their infinite wisdom, decided to remove <code>ptrace()</code> from the kernel. Yeah, Seriously. I have absolutely zero idea why they would remove <code>ptrace()</code> from the kernel,
+so instead of using that function, I had to use a bunch of random APIs to achieve <i>just part</i> of what was possible through <code>ptrace()</code>
+
+<h2>Part 2. Replacing ptrace()</h2><hr>
+<br>
+If I try to explain the Mach part of the XNU kernel I'm going to be here for days writing this and I have only a few hours remaining to finish this project.
+That being said, most functions / terms inside of this write-up are able to be googled. The only thing that needs to be known is that
+Mach is an inter-process communication mechanism that uses "Mach Ports" to send and receive messages with other processes and the kernel.
+
+<br><br>
+Now that we've got that out of the way, let's start replacing <code>ptrace()</code>.
+The first thing we need is the "inhertance" or control abilities of the caller.
+Fortunately, there is one function that allows us to take control of a remote task, and that's <code>task_for_pid()</code>.
+When I say "take control" what I really mean is that the function will give us a Mach send right to the task port, allowing us essentially
+to do whatever we want to the process.
+
+<br><br>
+<code>task_for_pid(mach_port_t owned_task, pid_t pid, mach_port_t* remote_task)</code> is loosely defined like this. (I couldn't find a formal definition, so I took some creative liberty with types)
+Once the function is called, (check in Machium.c for an example) remote_task should contain a reference to the target task. Remote_task is what we'll be using throughout the entire debugger.
+
+<br><br>
+Great. We've got the ability to play God with a remote process, so now what? How does that help us with our need to read / write register and memory?
+Unfortunately, we'll need to use various Mach APIs to achieve this task.
+Let's start with reading and writing memory. After some digging, I was able to find the functions <code>vm_read_overwrite()</code> and <code>vm_write()</code>.
+These two functions cover memory read/write in a specific task. For example usage and how I was able to create a wrapper for them, check Memory.c.
+Using <code>vm_read_overwrite()</code> was fairly easy, but <code>vm_write()</code> was a bit more difficult.
+I needed to use the <code>vm_region_64()</code> function to grab the memory protection information of the memory page where I'll be writing.
+After that, I had to change the memory protection through <code>vm_protect()</code> to <code>VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY</code> to write to to memory, and then reinstate
+the stored protection.
+<br><br>
+
+Memory read/write was fairly easy to handle. The next task of reading / writing register values was much more difficult than expected.
+I realized a problem VERY quickly when trying to develop the register read/write functionality: the register values that were
+being read / written to were the debugger's current values, and not those of the target task. I found a creative solution to this problem,
+which just feels like a hack, but that's what's required when Apple tosses <code>ptrace()</code> in the trash can.
+
+<h2>Part 3. The Journey to Achieve Register Read / Write</h2><hr>
+<br>
+Before revealing the solution to the problem described above, I'll explain how register read/write works.
+The function <code>task_threads()</code> allows for an array of threads for a given task (in this case our debug task) to be returned.
+Generally speaking, the first index in the array is the thread that is responsible for its main execution.
+Since it is assumed the first thread is the most important one, it is what will be used for getting register states.
+The function <code>thread_get_state()</code> allows for a set of registers to be returned for a given state.
+It is important to note that the function input depends on your CPU architecture and desired register types, because
+the kernel won't just sort that out for you. What we'll want returned are the ARM64 register states, defined in the struct behind the typedef <code>arm_thread_state64_t</code>
+For the calling convention, here is an example ripped from the Machium project. The context behind the code is self explanitory, but comments are in Register.c if needed.
+(<code>thread_get_state(thread_list[0], ARM_THREAD_STATE64, (arm_thread_state64_t) &state, &state_count)</code>)
+
+<br><br>
+Once we call that function, we can now access each register through <code>state</code>. Just remember, however, that the
+contents of <code>state</code> are simply the register values at the time of its calling and don't change in real time. The thread state / register struct looks like this:
+<br><br>
+<pre>
+    _STRUCT_ARM_THREAD_STATE64
+    {
+    	__uint64_t    __x[29];	/* General purpose registers x0-x28 */
+    	__uint64_t    __fp;		/* Frame pointer x29 */
+    	__uint64_t    __lr;		/* Link register x30 */
+    	__uint64_t    __sp;		/* Stack pointer x31 */
+    	__uint64_t    __pc;		/* Program counter */
+    	__uint32_t    __cpsr;	/* Current program status register */
+    };
+</pre>
+Source: <a href="https://opensource.apple.com/source/cctools/cctools-870/include/mach/arm/_structs.h">https://opensource.apple.com/source/cctools/cctools-870/include/mach/arm/_structs.h</a>
+</code>
+<br><br>
+For example, if I wanted to read the value of x5, I would do <code>printf("0xllx", state.__x[5])</code>. Writing to the registers is easy too, and can just be done through <code>=</code>.
+After accessing and writing to the registers, <code>thread_set_state()</code> must be called for the change to take place. The calling convention is the same as <code>thread_get_state()</code>
+
+<br><br>
+Don't worry, I didn't forget about the register access issue I described above. The solution to the active thread problem was much simpler than I anticipated, and I'm actually embarrassed how long it took me to figure out.
+Before and after <code>thread_get_state()</code> and <code>thread_set_state()</code> are called, I call <code>thread_suspend(thread_list[0])</code> and <code>thread_resume(thread_list[0])</code>
+on the first index of the thread list, which in theory should always pause the main execution thread of the target task.
+When they're paused and I call <code>thread_get_state()</code>, it'll return the last register values of the target task and not debugger code.
+
+<h2>Part 4. Adding Breakpoints and Watchpoints</h2><hr>
+<br>
+Almost every single debugger in existence has breakpoint / watchpoint functionality built into it, so I felt obligated to add it into Machium.
+The journey to adding breakpoints to the debugger was long and tedious, but it was rewarding to finally obtain break/watchpoint functionality.
+Let's start with setting breakpoints on ARM. How does that even work? Is it like x86?
+
+<br><br>
+Before showing my findings, I'll explain what hardware debugging looks on iOS. The code for obtaining debug registers is exactly the same as grabbing normal registers, but two things are changed.
+Instead of using the <code>arm_thread_state64_t</code> type defined struct and <code>ARM_THREAD_STATE64</code>, we use <code>arm_debug_state64_t</code> and <code>ARM_DEBUG_STATE64</code>. The struct is defined as follows:
+<br><br><pre>
+    _STRUCT_ARM_DEBUG_STATE64
+    {
+    	__uint64_t        __bvr[16];
+    	__uint64_t        __bcr[16];
+    	__uint64_t        __wvr[16];
+    	__uint64_t        __wcr[16];
+    	__uint64_t	  __mdscr_el1; /* Bit 0 is SS (Hardware Single Step) */
+    };
+</pre>
+Source: <a href="https://opensource.apple.com/source/cctools/cctools-870/include/mach/arm/_structs.h">https://opensource.apple.com/source/cctools/cctools-870/include/mach/arm/_structs.h</a>
+<br><br>
+<code>__bvr[16]</code> and <code>__wvr[16]</code> are the respective breakpoint / watchpoint registers. In order to set them, the same process as above is followed.
+The breakpoint registers should be set to an address in executable memory and the watchpoint registers should be set to a value in readable / writeable memory.
+Once the set address in the breakpoint register is executed, a breakpoint exception will be raised and execution will be halted.
+Similarly, once the memory address set in the watchpoint register is accessed or its content is changd, a watchpoint exception will be raised and execution will halt.
+<br><br>
+So what are the <code>__bcr[16]</code> and <code>__wcr[16]</code> variables used for then? Those are used for enabling / disabling breakpoints and watchpoints.
+After some digging through the <a href="https://developer.arm.com/documentation/ddi0488/h/debug/aarch64-debug-register-descriptions/debug-breakpoint-control-registers--el1?lang=en">ARM Debug Manual</a> I was able to find the exact bits I needed to flip in order to enable a breakpoint.
+I won't bore you will the details, but know that setting <code>__bcr[]</code> or <code>__wcr[]</code> to <code>0x1E1</code> will enable watchpoints and breakpoints.
+If you want to disable the breakpoints or watchpoints, set the registers back to 0. Just know that each value in the array corresponds with its respective break/watchpoint,
+so for example <code>__bcr[3]</code> must be set to the enable value in order for <code>__bvr[3]</code> to work.
+
+<br><br>
+There's one small detail that I didn't mention, however. Did you notice that there's 16 available debug registers?
+Yeah, that's a complete lie. For some reason, which is beyond my comprehension, only 6/16 debug registers actually work.
+Indexes 6-15 in the array do nothing if you set them to a memory value. Why? I have absolutely no idea, it's Apple logic, I guess.
+
+<br><br>
+The final step is catching breakpoints and watchpoints. There's two ways of accomplishing this task - using <code>signal()</code> or <code>task_set_exception_ports()</code>
+The easiest way of solving this problem is using <code>signal()</code> , but it requires one extra step. Compiling and linking a dynamic library to a target process that uses <code>__attribute__((constructor))</code> to raise
+<code>signal(SIGTRAP, handler)</code> before the main program runs will prevent crashing upon a hitting a break/watchpoint, but that's sloppy.
+The other solution of using <code>task_set_exception_ports()</code> is much more elegant.
+
+<br><br>
+In order to use <code>task_set_exception_ports()</code>, we start by allocating a mach port for the remote task using <code>mach_port_allocate()</code>. We give the mach port that we
+created a receive right (<code>MACH_PORT_RIGHT_RECEIVE</code>) so it's able to catch the breakpoint / watchpoint exception.
+Next, we use <code>mach_port_construct()</code> to construct a mach port with a send right (<code>MPO_INSERT_SEND_RIGHT</code>)
+so we can build our exception server that will receive the Mach message containing the exception.
+Lastly, we create the exception port using <code>task_set_exception_ports()</code> and set the exception flag to <code>EXC_MASK_BREAKPOINT</code>.
+We're able to create a mach receiver port successfully because we have a send right to the remote task that we're debugging thanks to <code>task_for_pid()</code>!
+For context and more detailed code, the function <code>start_exception_server(Machium* machium)</code> in Breakpoint.c shows this code to completion.
+
+<h2>Part 5. Finishing Up</h2><hr>
+<br>
+Almost everything is complete at this point. There's only a few things I didn't mention already in the write-up which are crucial to a debugger.
+First off, pausing and resuming the task is handled through <code>task_suspend(machium->debug_task)</code> and <code>task_resume(machium->debug_task)</code>.
+It's very trivial so I didn't mention it earlier, but since pausing and resuming is a core part of a debugger I figured I would include it here at the end.
+
+<br><br>
+Next, the debugger needs to be compiled and run exclusively on ARM64. If you try to compile this debugger on x86, it won't work.
+There are ARM specific functions and structs used inside of Machium which prevent it from being compiled elsewhere.
+So, how do you compile for ARM64? It's easy, just find yourself a jailbroken iOS device or Apple Silicon Mac.
+You will need root to run Machium, which can be obtained much more easily on Mac than iOS (unless you have some kernel exploits at your dispoal).
+
+<br><br>
+Lastly, after Machium is compiled, it requires proper entitlements to run.
+In order to add entitlements to Machium, use <code>ldid</code> and <a href="https://github.com/PsychoBird/Machium/blob/main/ent.xml">this entitlements XML file</a> to sign it correctly.
+Entitlements such as <code>task_for_pid-allow</code> are needed for debugging remote processes, unlocking <code>task_for_pid()</code> usage.
+Almost all of Machium can be slightly modified and inserted into a dynamic library to run under a self task context, but that's not as useful.
+
+<br><br>
+Finally, we've reached the end. In terms of using the debugger, if you have a device that can run Machium, run the debugger with the target process ID and it'll automatically attach.
+I was fortunately able to achieve most of what I wanted with this debugger, and I will most likely use this as a lightweight lldb replacement for my own work.
+In the future, instruction stepping can be added along with smart breaking to expand upon the 6 register limit, but that's not a problem for right now.
+Hopefully now that most of my programming bucket list is complete I can spend some time on iOS security research, which will be a
+journey much larger than Machium.
+
+<br><br>
+Thank you for reading, and if you are interested in Machium, the source code is linked at the top.
+
+<h2>Images</h2><hr>
+<br>
+<img src="Images/image1.png" alt="Help Menu">
+<br><br>
+<img src="Images/image2.png" alt="Breakpoints and Reading Registers">
+<br><br>
+<img src="Images/image3.png" alt="Reading Memory">
+
+
+
+
+
+</head>
+</html>
