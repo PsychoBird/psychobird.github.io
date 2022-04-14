@@ -1,0 +1,217 @@
+<html>
+<head>
+
+<title>Anti-Cheat</title>
+<body style="font-family:'Helvetica'">
+
+
+<style>
+    code.indent{
+        padding-left: 1.8em
+    }
+
+    div {
+      background-color: clear;
+      width: 60%;
+      border: 15px clear;
+      padding: 50px;
+      margin: auto;
+    }
+
+    body {
+        font-size: 17px;
+    }
+
+</style>
+
+<div>
+<center>
+<h1>Reverse Engineering Supercell Games - (Responsibly) Poking Holes in Anti-Cheat</h1>
+<p>A full anti-tamper, anti-debug, and anti-dylib bypass</p>
+<i>January 22, 2022 (published April 14, 2022)</i><hr>
+</center>
+
+<h2>Introduction</h2><hr>
+<br>
+
+Before I start, it should be known that everything reported in this write-up has been patched and responsibly disclosed to Supercell.
+Also, if you're wondering why there is a 3 month inconsistency between the date written and released, it's because I wanted to give
+PLENTY of time for this work to become irrelevant.
+<br><br>
+
+I have disclosed some content to Supercell in the past,
+but haven't ever touched their anti cheat. After all, I didn't have a reason to until recent months.
+Once I completed my hooking library and debugger (shameless plug) I found that I had difficulty testing it in Supercell games.
+My testing ground had been Clash of Clans for many years, but nothing ever came of my countless hours of poking around the game.
+That's until October of 2021, when Supercell released an update where they included a few new protections in the game.
+Within a few hours of testing, I discovered a all-in-one bypass to Clash of Clans' debugger protection, modification prevention, and jailbreak detection.
+
+
+<h2>Let's talk anti-cheat</h2><hr>
+<br>
+Anti-tamper was placed inside of Supercell games to prevent some blatant cheating, and for a while it was successful.
+You could still argue that it accomplished its original goal, because cheating in Supercell games is fairly limited and far less popular than it was in 2016.
+<br><br>
+I have no idea when anti-cheat was included in Clash of Clans or any Supercell games, but if I had to guess, it was implemented in late 2017.
+For the rest of this write-up, I'll be solely discussing Clash of Clans, because I haven't checked if these methods work in other games.
+Anyway, let's fast forward to October of 2021. When I woke up one day and decided to play Clash of Clans, I noticed that the game was crashing.
+It turned out that Supercell added jailbreak detection into their game, which is around a half a decade late, but better late than never.
+I tried to use an anti-jailbreak detection tweak to play the game, but it turned out that was of no use.
+After some digging, I found that I left my hooking library running inside of the game when I was attempting to develop a proxy.
+Well, that's annoying. It put a huge dent in my progress, because before that I never had any crashing issues.
+<br><br>
+Well, that's a bit of a lie. I didn't really think much of it, but I had to develop a anti-tamper bypass in order to get my proxy working.
+How did Supercell's anti-tamper work? Well, here is my educated guess - a guess that I'm fairly confident is accurate, but ultimately I
+have certain assetion because I don't have access to debug symbols.
+
+<h2>The anti-tamper bypass</h2><hr>
+<br>
+The anti-tamper bypass was the first thing I developed, and to be completely honest I'm proud of it.
+So, what's the issue at hand? Let me explain: pre-October update (ignoring the loaded library detection), if you
+loaded a dynamic library into the game and tried to patch the game before it started, it would crash.
+<br><br>
+Before I begin talking about the bypass, let's discuss what DOES still work. If you decide to modify a stub function
+(a small, 3 instruction function leading to standard library functions) or modify __DATA__ the game will not crash. This information doesn't allow for much,
+because at the end of the day hooking standard functions only allows for a bit of info collection and __DATA__ is basically useless anyway.
+<br><br>
+The bypass is very trivial, and only involves a thread. For this example I'll be using my hooking library Capere.
+In order to get around the anti-tamper, load a dynamic library into the game. Before Clash of Clans runs,
+start a thread which will do nothing for 10 seconds. In the course of those ten seconds, the game will load
+and all anti-tamper checks will have already been passed. Once the 10 seconds have elapsed,
+the thread will use Capere to place a hook at the target function. Unfortuantely, this bypass will not survive a game restart.
+If the game reloads it will crash again, but this bypass is still a fairly singificant non-persistent way of hooking game functions.
+<br><br>
+Here is an attached snippet of how using a thread allows for the anti-tamper to be bypassed:
+
+
+<pre>
+    void __attribute__((constructor)) hook_load();
+
+    void hook_function() {
+        printf("Pretend I hooked a game function here");
+    }
+
+    void *hook_thread(void *arg)
+        //wait 10 seconds for anti-cheat to run its course
+        sleep(10);
+
+        Capere* HookExample = CapereInit(0xDEADBEEF, hook_function);
+
+        //let's hook the game without crashing!
+        HookExample->Hook(HookExample);
+        return NULL;
+    }
+
+    static void hook_load()
+    {
+        pthread_t thread_id;
+        pthread_create(&thread_id, NULL, hook_thread, NULL);
+    }
+</pre>
+<br>
+So, what's next? Well, in October of 2021, the loaded library deteciton made any hooking very difficult.
+The above bypass is still exploitable in the game, but made more difficult with the introduction of anti-loaded library detection.
+Before I begin talking about the library detection, let's discuss anti-debug, since it's an important part of this bypass.
+
+<h2>The anti-debug bypass</h2><hr>
+<br>
+The anti-debug inside of the game is weird. It doesn't have to be patched out, but timed perfectly in two different places to be used.
+Similar to the anti-tamper, if you load the game and wait around 10 seconds before starting lldb, it will work just fine.
+Just start lldb, launch the game without going through lldb, and wait before attaching to Clash of Clans. I don't know if
+this was intentional, but it was an easy way for me to attach lldb to the game without any crashing issues. Once again,
+if the game reloads, the game will still crash because it will once again trigger the anti-tamper / anti-debug.
+
+There is a second way of attaching a debugger to the game, but it requires quick reflexes.
+In between the game launching and the "SUP ERC ELL" logo appearing, there is around a 1-2 second window
+where a debugger can be attached without tripping any anti-debug measures. Why is this useful?
+This 1-2 second window allows for the anti-dylib bypass.
+
+<h2>The anti-dylib bypass</h2><hr>
+<br>
+When the game starts, there is a small window where the dynamic library linked to the game will load. The user has around 1-2 seconds before
+the anti-dylib loads in and crashes the game, which is a time where the user can attach a debugger. How can this be abused?
+<br><br>
+The anti-dylib protection crashes before the anti-debug, so therefore we can use a debugger to bypass the anti-dylib protection.
+For example, I can attach lldb before the "SUP ERC ELL" logo, wait for the game to crash, and then inspect registers.
+Being able to inspect the registers before crashing is very useful, because using <code>reg read</code> inside of lldb
+allows me to view the Link Register (LR) state, which is where the processor will return execution to after the current function returns.
+Once I get that LR address, I write it down, open a disassembler (Hopper is my choice), and then go to the LR address.
+At that LR address, I step 1 instruction backwards find the branch instruction that will redirect the program to the
+"crashing" function which just seems to run the stack pointer out of bounds.
+<br><br>
+At this point, I am able to repeat the same process described above. I attach a breakpoint at (old link register - 0x4) which is one
+instruction backwards. I run the game again, attach a debugger, and wait for the breakpoint to hit. Once again, I obtain the link
+register and go to that function inside of Hopper. At this point, I can apply a patch to Clash of Clans which will prevent Clash of Clans
+from branching to the function which calls the "crashing" function. Here is a screenshot of it in practice:
+<br><br>
+<center>Disassembler View (I actually paid for Hopper - my license just ran out unfortunately)</center>
+<br>
+<center><img src="hopper.png" alt="Disassembler View (I paid for Hopper - my license just ran out unfortunately)" height="500" width="768"></center>
+<br><br>
+
+So, let's run through this process again in bullet point form because describing a process in a paragraph form isn't exactly intuitive.
+<br>
+<br>
+1. Attach lldb to the game in the 1-2 second window before the SUPERCELL logo appears<br>
+2. Let the game crash because of the anti-dylib protection<br>
+3. Steal the Link Register address upon crashing and load it into a disassembler<br>
+4. Go backwards one instruction from the LR address, run lldb + the game again, and attach a breakpoint at that address<br>
+5. Let the debugger hit that breakpoint, and once again obtain the Link Register address.<br>
+6. Go to the Link Register address and backwards one instruction, and patch the corresponding BR instruction (as seen in screenshot)
+<br><br>
+There's one small issue at this point, and that's still dealing with the anti-tamper. Bypassing both the anti-dylib and anti-tamper
+is possible though, simply because they're called at different times. For this example, we'll be using Capere and signal().
+In the constructor .dylib, I place a Capere->Hook at the branch instruction which we need to patch out. I let the hook function
+inside of my .dylib restore the original instruction at the anti-dylib branch, and then execution (original_instruction_address+0x4())
+to jump over the branch and bypass the anti-dylib protection. Also, since we're restoring the original instruction,
+the anti-tamper will also be bypassed. I have to add signal() into my constructor for some reason, because somewhere a SIGABRT is raised.
+Just having the signal() get discarded is enough to bypass this issue.
+After all of this, game functions can be hooked and all anti-cheat measures have been effectively bypassed.
+Also, I want to emphasize that this process works for every single Clash of Clans version, and there isn't any sort of "randomness".
+This method appears to be a universal bypass.<br><br>
+Here is the full bypass in C code:<br>
+
+<pre>
+    uint64_t patch_address = 0xDEADC0DE;
+    void __attribute__((constructor)) hook_load();
+    Capere* CrashHook = 0x0;
+
+    void hook_function() {
+        printf("Pretend I hooked a game function here");
+    }
+
+    void bypass() {
+        //restore original instruction to prevent anti-dylib from running
+        CrashHook->HookRestore(CrashHook);
+
+        //jump 1 instruction ahead to "jump over" anti-dylib function
+        ((void (*)(void)) (patch_address+0x4))();
+    }
+
+    void *hook_thread(void *arg)
+        //wait 10 seconds for anti-cheat to run its course
+        sleep(10);
+
+        Capere* HookExample = CapereInit(0xDEADBEEF, hook_function);
+
+        //let's hook the game without crashing!
+        HookExample->Hook(HookExample);
+        return NULL;
+    }
+
+    static void hook_load()
+    {
+        //prevent SIGABRT, lazy solution but works
+        signal(SIGABRT, SIG_IGN);
+
+        //Hook to function which will bypass anti-dylib
+        CrashHook = CapereInit(patch_address, bypass);
+        CrashHook->Hook(CrashHook);
+
+        pthread_t thread_id;
+        pthread_create(&thread_id, NULL, hook_thread, NULL);
+    }
+</pre>
+
+</head>
+</html>
