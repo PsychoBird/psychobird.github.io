@@ -4,7 +4,6 @@
 <title>Anti-Cheat</title>
 <body style="font-family:'Helvetica'">
 
-
 <style>
     code.indent{
         padding-left: 1.8em
@@ -25,25 +24,24 @@
 </style>
 
 <div>
+<code><a href="../index.html"> < back</a></code><hr>
+
 <center>
-<h1>Reverse Engineering Supercell Games - (Responsibly) Disclosing Holes in their Anti-Cheat</h1>
+<h1>Discovering Flaws in Anti-Cheat Systems - Responsibly Disclosing Vulnerabilities in Supercell Games</h1>
 <p>A full anti-tamper, anti-debug, and anti-dylib bypass</p>
-<i>January 22, 2022 (published April 14, 2022, updated November 15, 2022)</i><hr>
+<i>January 22, 2022 (published April 14, 2022)</i><hr>
 </center>
 
 <h2>Introduction</h2><hr>
 <br>
 
-Before I begin, it should be known that everything reported in this write-up has been patched and responsibly disclosed to Supercell.
+Before I begin, it should be known that everything reported in this write-up was discovered with permission, in a controlled environment, and all content has been patched and responsibly disclosed to Supercell.
 The noticable 3 month gap in between the date this blog post was written and released was due a disclosure period I gave to the developers,
 so there was plenty of time for this work to be analyzed and patched by the team.
 <br><br>
 
 Over the last few years, I have disclosed various vulnerabilites and bugs to Supercell,
-but I never touched their anti cheat. The reason being that I didn't have a purpose to until recently.
-Upon completing my hooking library and debugger, (shameless plug) I found testing them in Supercell games became suddenly difficult.
-My testing ground had been Clash of Clans for many years, but nothing ever came of my countless hours of poking around the game.
-That was true until October of 2021, when Supercell released an update where they included some new protections inside of the game.
+but I never touched their anti cheat. The reason being that I didn't have a purpose to until recently, which was true until October of 2021, when Supercell released an update where they included some new protections inside of the game.
 After some time spent reverse engineering the game,
 I discovered a all-in-one bypass to Clash of Clans' debugger protection, modification prevention, and jailbreak detection.
 

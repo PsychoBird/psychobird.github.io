@@ -1,0 +1,21 @@
+code.indent{
+    padding-left: 1.8em
+}
+
+body {
+    background-color: clear;
+    width: 60%;
+    border: 15px clear;
+    padding: 50px;
+    margin: auto;
+    font-size: 17px;
+}
+
+ul {
+    list-style: none;
+    padding-left: 1.5em;
+}
+
+li {
+    margin-bottom: 0.5em;
+}
