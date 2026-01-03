@@ -249,7 +249,7 @@ search_t search_data(mach_port_t task, vm_address_t baseaddr, vm_address_t endad
 </p></small>
 
 <p>
-    This function has been thinned down; the full version of the search function is available on the <a href="https://github.com/PsychoBird/RevelariOS/blob/master/SearchKit/SearchKit.h#L55">GitHub repository</a> for SearchKit / RevelariOS. The only major difference between the code snippet above and the real function is that we search for 255 total addresses and that the input formatter hasn't been removed.
+    This function has been thinned down; the full version of the search function is available on the <a href="https://github.com/nickingravallo/RevelariOS/blob/master/SearchKit/SearchKit.h#L55">GitHub repository</a> for SearchKit / RevelariOS. The only major difference between the code snippet above and the real function is that we search for 255 total addresses and that the input formatter hasn't been removed.
 </p>
 
 
@@ -312,11 +312,11 @@ search_t search_data(mach_port_t task, vm_address_t baseaddr, vm_address_t endad
 </p>
 
 <p>
-    For usage, let's look at <a href="https://github.com/PsychoBird/RevelariOS">RevelariOS</a>, which is SearchKit wrapped inside of a tool I developed. RevelariOS is a command line utility and an iOS appication for searching memory. With it, we can find information from memory by searching for through the command line or inside of the app. Trying to find instances of string in memory? RevelariOS can do that. Want to find pointers that hold a specific address? RevelariOS can do that. As mentioned before, the full version of the function <code>search_data</code> supports up to 255 result addresses. That number can be increased to 65536, but it is only useful in some scenarios. For example, holding that many addresses means that we can track down every instance of a loaded mach-o binary in memory by searching for <code>0xfeedfacf</code>, the mach-o magic number. Just make sure that the header is in Little Endian! Finding where binaries are loaded can be used for dumping applications, for example. The only real limitations of RevelariOS / SearchKit are your imagination. I've used it countless times in my own research.
+    For usage, let's look at <a href="https://github.com/nickingravallo/RevelariOS">RevelariOS</a>, which is SearchKit wrapped inside of a tool I developed. RevelariOS is a command line utility and an iOS appication for searching memory. With it, we can find information from memory by searching for through the command line or inside of the app. Trying to find instances of string in memory? RevelariOS can do that. Want to find pointers that hold a specific address? RevelariOS can do that. As mentioned before, the full version of the function <code>search_data</code> supports up to 255 result addresses. That number can be increased to 65536, but it is only useful in some scenarios. For example, holding that many addresses means that we can track down every instance of a loaded mach-o binary in memory by searching for <code>0xfeedfacf</code>, the mach-o magic number. Just make sure that the header is in Little Endian! Finding where binaries are loaded can be used for dumping applications, for example. The only real limitations of RevelariOS / SearchKit are your imagination. I've used it countless times in my own research.
 </p>
 
 <p>
-    RevelariOS was developed to show off the power of SearchKit. It can also read / write memory and pause our searching task, making it a multi purpose utility. If you made it this far, I recommend checking out the <a href="https://github.com/PsychoBird/RevelariOS">GitHub repository</a> for RevelariOS. You might be able to find it useful for yourself or even develop it further. Innovation breeds from sharing ideas. :)
+    RevelariOS was developed to show off the power of SearchKit. It can also read / write memory and pause our searching task, making it a multi purpose utility. If you made it this far, I recommend checking out the <a href="https://github.com/nickingravallo/RevelariOS">GitHub repository</a> for RevelariOS. You might be able to find it useful for yourself or even develop it further. Innovation breeds from sharing ideas. :)
 </p>
 
 
